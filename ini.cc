@@ -104,27 +104,3 @@ std::optional<INI> INI::from_string(std::string const& content)
 
 	return { ini };
 }
-
-#ifdef Ini_Example
-int main()
-{
-	auto maybe_ini = INI::from_file("./example.ini");
-
-	if (!maybe_ini) {
-		std::cerr << "Could not load file `example.ini`\n";
-		return 1;
-	}
-
-	auto ini = *std::move(maybe_ini);
-
-	for (auto const& node : ini.nodes) {
-		switch (node.kind) {
-			case INI::Node::Kind::Section: std::cout << "SECTION: "; break;
-			case INI::Node::Kind::Key: std::cout << "KEY: "; break;
-			case INI::Node::Kind::Value: std::cout << "VALUE: "; break;
-		}
-
-		std::cout << node.value << '\n';
-	}
-}
-#endif
