@@ -1,4 +1,4 @@
-# inifs
+# INIfs
 
 Educational filesystem allowing for FS traversal over INI file
 
