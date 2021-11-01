@@ -50,6 +50,8 @@ namespace inifs
 	static int getattr(char const* path, struct stat *stbuf, fuse_file_info*)
 	{
 		memset(stbuf, 0, sizeof(*stbuf));
+		update_stat(stbuf);
+
 		if ("/"sv == path) {
 			stbuf->st_mode = S_IFDIR | 0755;
 			stbuf->st_nlink = 2;
@@ -65,7 +67,6 @@ namespace inifs
 				stbuf->st_mode = S_IFREG | 0644;
 				stbuf->st_nlink = 1;
 				stbuf->st_size = key.value().size();
-				update_stat(stbuf);
 				return 0;
 			}
 			return -ENOENT;
@@ -74,14 +75,12 @@ namespace inifs
 		if (auto section = ini.sections(); section && (section = std::find(section, {}, p))) {
 			stbuf->st_mode = S_IFDIR | 0755;
 			stbuf->st_nlink = 2;
-			update_stat(stbuf);
 			return 0;
 		}
 		if (auto key = ini.section_keys(); key && (key = std::find(key, {}, p))) {
 			stbuf->st_mode = S_IFREG | 0644;
 			stbuf->st_nlink = 1;
 			stbuf->st_size = key.value().size();
-			update_stat(stbuf);
 			return 0;
 		}
 
