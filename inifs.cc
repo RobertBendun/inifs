@@ -49,42 +49,43 @@ namespace inifs
 
 	static int getattr(char const* path, struct stat *stbuf, fuse_file_info*)
 	{
-		int res = -ENOENT;
-
 		memset(stbuf, 0, sizeof(*stbuf));
-		if (strcmp(path, "/") == 0) {
+		if ("/"sv == path) {
 			stbuf->st_mode = S_IFDIR | 0755;
 			stbuf->st_nlink = 2;
-			res = 0;
-		} else {
-			std::string_view p = path+1;
-			auto split = p.find('/');
-			if (split == std::string_view::npos) {
-				if (auto section = ini.sections(); section && (section = std::find(section, {}, p))) {
-					stbuf->st_mode = S_IFDIR | 0755;
-					stbuf->st_nlink = 2;
-					update_stat(stbuf);
-					return 0;
-				}
-
-				if (auto const key = std::find(ini.section_keys(), {}, p); key) {
-					stbuf->st_mode = S_IFREG | 0644;
-					stbuf->st_nlink = 1;
-					stbuf->st_size = key.value().size();
-					update_stat(stbuf);
-					return 0;
-				}
-			} else {
-				if (auto const key = std::find(ini.section_keys(p.substr(0, split)), {}, p.substr(split + 1)); key) {
-					stbuf->st_mode = S_IFREG | 0644;
-					stbuf->st_nlink = 1;
-					stbuf->st_size = key.value().size();
-					update_stat(stbuf);
-					return 0;
-				}
-			}
+			return 0;
 		}
-		return res;
+
+		std::string_view p = path+1;
+
+		if (auto split = p.find('/'); split != std::string_view::npos) {
+			auto const section    = p.substr(0, split);
+			auto const target_key = p.substr(split + 1);
+			if (auto const key = std::find(ini.section_keys(section), {}, target_key); key) {
+				stbuf->st_mode = S_IFREG | 0644;
+				stbuf->st_nlink = 1;
+				stbuf->st_size = key.value().size();
+				update_stat(stbuf);
+				return 0;
+			}
+			return -ENOENT;
+		}
+
+		if (auto section = ini.sections(); section && (section = std::find(section, {}, p))) {
+			stbuf->st_mode = S_IFDIR | 0755;
+			stbuf->st_nlink = 2;
+			update_stat(stbuf);
+			return 0;
+		}
+		if (auto key = ini.section_keys(); key && (key = std::find(key, {}, p))) {
+			stbuf->st_mode = S_IFREG | 0644;
+			stbuf->st_nlink = 1;
+			stbuf->st_size = key.value().size();
+			update_stat(stbuf);
+			return 0;
+		}
+
+		return -ENOENT;
 	}
 
 	static int readdir(
