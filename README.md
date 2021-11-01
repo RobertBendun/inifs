@@ -2,6 +2,15 @@
 
 Educational filesystem allowing for FS traversal over INI file
 
+| Filesystem | INI |
+| :---: | :---: |
+| Read file `filename` | Read value of a key `filename` |
+| Write `value` to file `filename` | Make key `filename` with value `value` |
+| Make directory `dir` | Make section `dir` |
+| Read file `filename` in directory `dir` | Read value of a key `filename` in section `dir` |
+| Write `value` to file `filename` in directory `dir` | Make key `filename` in section `dir` with value `value` |
+
+
 ## Example
 For file `example.ini`:
 ```ini
