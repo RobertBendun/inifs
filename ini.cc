@@ -89,8 +89,11 @@ struct Sections_Iterator : INI_Iterator<Sections_Iterator>
 		assert(i < ini->nodes.size());
 
 		for (++i; i < ini->nodes.size(); ++i)
-			if (ini->nodes[i].kind == INI::Node::Kind::Section)
+			if (node().kind == INI::Node::Kind::Section)
 				break;
+
+		if (i == ini->nodes.size())
+			ini = nullptr;
 
 		return *this;
 	}
@@ -110,7 +113,6 @@ struct Section_Keys_Iterator : INI_Iterator<Section_Keys_Iterator>
 				ini = nullptr;
 				return *this;
 			}
-
 			assert(node().kind == INI::Node::Kind::Key);
 		}
 

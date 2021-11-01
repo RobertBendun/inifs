@@ -60,10 +60,18 @@ namespace inifs
 			std::string_view p = path+1;
 			auto split = p.find('/');
 			if (split == std::string_view::npos) {
-				if (auto section_it = std::find(ini.sections(), {}, path + 1); section_it) {
+				if (auto section = ini.sections(); section && (section = std::find(section, {}, p))) {
 					stbuf->st_mode = S_IFDIR | 0755;
 					stbuf->st_nlink = 2;
 					stbuf->st_size = 0; // TODO add size
+					update_stat(stbuf);
+					return 0;
+				}
+
+				if (auto key = std::find(ini.section_keys(), {}, p); key) {
+					stbuf->st_mode = S_IFREG | 0644;
+					stbuf->st_nlink = 1;
+					stbuf->st_size = key.value().size();
 					update_stat(stbuf);
 					return 0;
 				}
@@ -93,6 +101,9 @@ namespace inifs
 			for (auto section = ini.sections(); section; ++section) {
 				filler(buf, section->c_str(), NULL, 0, {});
 			}
+			for (auto key = ini.section_keys(); key; ++key) {
+				filler(buf, key->c_str(), NULL, 0, {});
+			}
 			return 0;
 		}
 
@@ -110,16 +121,11 @@ namespace inifs
 		auto p = std::string_view(path + 1);
 		auto split = p.find('/');
 
-		if (split == std::string::npos) {
-			// Sectionless entries
-			assert(false && "unimplemented");
-		} else {
-			if (!std::find(ini.section_keys(p.substr(0, split)), {}, p.substr(split + 1)))
-				return -ENOENT;
+		if (!std::find(ini.section_keys(split == std::string_view::npos ? "" : p.substr(0, split)), {}, p.substr(split + 1)))
+			return -ENOENT;
 
-			if ((fi->flags & O_ACCMODE) != O_RDONLY)
-				return -EACCES;
-		}
+		if ((fi->flags & O_ACCMODE) != O_RDONLY)
+			return -EACCES;
 
 		return 0;
 	}
@@ -129,23 +135,20 @@ namespace inifs
 		auto p = std::string_view(path + 1);
 		auto split = p.find('/');
 
-		if (split == std::string::npos) {
-			// Sectionless entries
-			assert(false && "unimplemented");
-		} else {
-			if (auto key = std::find(ini.section_keys(p.substr(0, split)), {}, p.substr(split + 1)); key) {
-				auto const data = key.value().data();
-				auto const len = key.value().size();
-				if ((unsigned)offset < len) {
-					if (offset + size > len)
-						size = len - offset;
-					memcpy(buf, data + offset, size);
-				} else {
-					size = 0;
-				}
+
+		if (auto key = std::find(ini.section_keys(split == std::string_view::npos ? "" : p.substr(0, split)), {}, p.substr(split + 1));
+				key) {
+			auto const data = key.value().data();
+			auto const len = key.value().size();
+			if ((unsigned)offset < len) {
+				if (offset + size > len)
+					size = len - offset;
+				memcpy(buf, data + offset, size);
 			} else {
-				return -ENOENT;
+				size = 0;
 			}
+		} else {
+			return -ENOENT;
 		}
 
 		return size;
