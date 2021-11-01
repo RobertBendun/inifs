@@ -24,15 +24,6 @@ struct INI
 	std::vector<Node> nodes;
 
 	template<typename T>
-	void for_all_sections(T &&t)
-	{
-		for (auto const& node : nodes) {
-			if (node.kind == Node::Kind::Section)
-				t(node.value);
-		}
-	}
-
-	template<typename T>
 	bool for_section(std::string_view name, T &&t)
 	{
 		for (auto i = 0u; i < nodes.size(); ++i)
