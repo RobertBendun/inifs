@@ -20,6 +20,14 @@ struct INI
 
 	std::vector<Node> nodes;
 
+	template<typename T>
+	void for_all_sections(T &&t)
+	{
+		for (auto const& node : nodes) {
+			if (node.kind == Node::Kind::Section)
+				t(node.value);
+		}
+	}
 
 	static std::optional<INI> from_file(std::string const& filename);
 	static std::optional<INI> from_string(std::string const& content);

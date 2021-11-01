@@ -5,6 +5,8 @@
 #define FUSE_USE_VERSION 31
 #include <fuse.h>
 
+#include "ini.cc"
+
 static struct options {
 	char const* ini_filename;
 	int show_help;
@@ -22,6 +24,8 @@ static const struct fuse_opt option_spec[] = {
 
 #define Content "hello, world!\n"
 
+INI ini;
+
 namespace inifs
 {
 	static void* init(fuse_conn_info *, fuse_config *cfg)
@@ -32,20 +36,23 @@ namespace inifs
 
 	static int getattr(char const* path, struct stat *stbuf, fuse_file_info*)
 	{
-		int res = 0;
+		int res = -ENOENT;
 
 		memset(stbuf, 0, sizeof(*stbuf));
 		if (strcmp(path, "/") == 0) {
 			stbuf->st_mode = S_IFDIR | 0755;
 			stbuf->st_nlink = 2;
-		} else if (strcmp(path + 1, "xd") == 0) {
-			stbuf->st_mode = S_IFREG | 0444;
-			stbuf->st_nlink = 1;
-			stbuf->st_size = strlen(Content);
+			res = 0;
 		} else {
-			res = -ENOENT;
+			ini.for_all_sections([&](std::string const& section) {
+				if (section == path + 1) {
+					stbuf->st_mode = S_IFDIR | 0755;
+					stbuf->st_nlink = 2;
+					stbuf->st_size = 0; // TODO add size
+					res = 0;
+				}
+			});
 		}
-
 		return res;
 	}
 
@@ -56,12 +63,17 @@ namespace inifs
 			fuse_file_info*,
 			fuse_readdir_flags)
 	{
+		printf("readdir: %s\n", path);
 		if (strcmp(path, "/") != 0)
 			return -ENOENT;
 
 		filler(buf, ".", NULL, 0, {});
 		filler(buf, "..", NULL, 0, {});
-		filler(buf, "xd", NULL, 0, {});
+
+		ini.for_all_sections([&](std::string const& section) {
+			filler(buf, section.c_str(), NULL, 0, {});
+		});
+
 		return 0;
 	}
 
@@ -109,6 +121,19 @@ int main(int argc, char **argv)
 	fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	if (fuse_opt_parse(&args, &options, option_spec, nullptr) == -1)
 		return 1;
+
+	if (!options.ini_filename) {
+		std::cerr << "inifs: no INI file was provided\n";
+		return 2;
+	}
+
+	if (auto maybe_ini = INI::from_file(options.ini_filename); maybe_ini) {
+		ini = *std::move(maybe_ini);
+	} else {
+		std::cerr << "inifs: invalid INI file\n";
+		return 3;
+	}
+
 
 	auto ret = fuse_main(args.argc, args.argv, &oper, nullptr);
 	fuse_opt_free_args(&args);
