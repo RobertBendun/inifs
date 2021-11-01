@@ -170,6 +170,26 @@ namespace inifs
 		new_node.value = p;
 		return 0;
 	}
+
+	static int rmdir(char const* path)
+	{
+#ifdef Debug_Mode
+		std::cout << "rmdir(" << std::quoted(path) << ")\n";
+#endif
+
+		if (path == "/"sv)
+			return -ENOTEMPTY;
+
+		if (auto section = ini.sections(); section && (section = std::find(section, {}, path + 1))) {
+			if (auto next = std::next(section); next ? next.node().kind == INI::Node::Kind::Section : 1) {
+				ini.nodes.erase(ini.nodes.cbegin() + section.i);
+				return 0;
+			}
+			return -ENOTEMPTY;
+		}
+
+		return -ENOTDIR;
+	}
 }
 
 int main(int argc, char **argv)
@@ -181,6 +201,7 @@ int main(int argc, char **argv)
 	oper.open    = inifs::open;
 	oper.read    = inifs::read;
 	oper.readdir = inifs::readdir;
+	oper.rmdir   = inifs::rmdir;
 
 	fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	if (fuse_opt_parse(&args, &options, option_spec, nullptr) == -1)
