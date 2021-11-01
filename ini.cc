@@ -5,6 +5,7 @@
 #include <cassert>
 
 struct Sections_Iterator;
+struct Section_Keys_Iterator;
 
 struct INI
 {
@@ -23,24 +24,8 @@ struct INI
 
 	std::vector<Node> nodes;
 
-	template<typename T>
-	bool for_section(std::string_view name, T &&t)
-	{
-		for (auto i = 0u; i < nodes.size(); ++i)
-			if (auto const& node = nodes[i]; node.kind == Node::Kind::Section && node.value == name) {
-				for (i += 1; i < nodes.size() - 1; i += 2) {
-					if (nodes[i].kind != Node::Kind::Key || nodes[i+1].kind != Node::Kind::Value)
-						break;
-
-					t(nodes[i].value, nodes[i+1].value);
-				}
-				return true;
-			}
-
-		return false;
-	}
-
 	Sections_Iterator sections() const;
+	Section_Keys_Iterator section_keys(std::string_view section_name = {}) const;
 
 	static std::optional<INI> from_file(std::string const& filename);
 	static std::optional<INI> from_string(std::string const& content);
@@ -73,6 +58,14 @@ struct INI_Iterator
 		return ini->nodes[i];
 	}
 
+	auto value() const -> std::string const&
+	{
+		assert(ini != nullptr);
+		assert(i + 1 < ini->nodes.size());
+		assert(ini->nodes[i+1].kind == INI::Node::Kind::Value);
+		return ini->nodes[i+1].value;
+	}
+
 	operator bool() const {
 		return ini != nullptr && i < ini->nodes.size();
 	}
@@ -103,11 +96,48 @@ struct Sections_Iterator : INI_Iterator<Sections_Iterator>
 	}
 };
 
+struct Section_Keys_Iterator : INI_Iterator<Section_Keys_Iterator>
+{
+	Section_Keys_Iterator& operator++()
+	{
+		assert(ini != nullptr);
+		assert(i < ini->nodes.size());
+
+		i += 2;
+
+		if (i < ini->nodes.size()) {
+			if (node().kind == INI::Node::Kind::Section) {
+				ini = nullptr;
+				return *this;
+			}
+
+			assert(node().kind == INI::Node::Kind::Key);
+		}
+
+		return *this;
+	}
+};
+
 Sections_Iterator INI::sections() const
 {
 	for (auto i = 0u; i < nodes.size(); ++i)
 		if (nodes[i].kind == Node::Kind::Section)
 			return Sections_Iterator {{ this, i }};
+
+	return {};
+}
+
+Section_Keys_Iterator INI::section_keys(std::string_view section) const
+{
+	if (section.empty()) {
+		if (!nodes.empty() && nodes.front().kind == Node::Kind::Key)
+			return Section_Keys_Iterator {{ this, 0 }};
+		return {};
+	}
+
+	for (auto i = 0u; i < nodes.size(); ++i)
+		if (nodes[i].kind == Node::Kind::Section && nodes[i].value == section)
+			return Section_Keys_Iterator {{ this, i + 1 }};
 
 	return {};
 }

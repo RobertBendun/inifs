@@ -68,16 +68,13 @@ namespace inifs
 					return 0;
 				}
 			} else {
-				auto target_key = p.substr(split + 1);
-				ini.for_section(p.substr(0, split), [&](std::string const& key, std::string const& value) {
-					if (key == target_key) {
-						stbuf->st_mode = S_IFREG | 0644;
-						stbuf->st_nlink = 1;
-						stbuf->st_size = value.size();
-						update_stat(stbuf);
-						res = 0;
-					}
-				});
+				if (auto key = std::find(ini.section_keys(p.substr(0, split)), {}, p.substr(split + 1)); key) {
+					stbuf->st_mode = S_IFREG | 0644;
+					stbuf->st_nlink = 1;
+					stbuf->st_size = key.value().size();
+					update_stat(stbuf);
+					return 0;
+				}
 			}
 		}
 		return res;
@@ -99,9 +96,11 @@ namespace inifs
 			return 0;
 		}
 
-		bool section_found = ini.for_section(path + 1, [&](std::string const& key, std::string const&) {
-			filler(buf, key.c_str(), NULL, 0, {});
-		});
+		bool section_found = false;
+		for (auto key = ini.section_keys(path + 1); key; ++key) {
+			section_found = true;
+			filler(buf, key->c_str(), NULL, 0, {});
+		}
 
 		return section_found ? 0 : -ENOENT;
 	}
@@ -115,15 +114,7 @@ namespace inifs
 			// Sectionless entries
 			assert(false && "unimplemented");
 		} else {
-			auto const target_key = p.substr(split + 1);
-			bool key_found = false;
-			ini.for_section(p.substr(0, split), [&](std::string const& key, std::string const&) {
-				if (target_key == key) {
-					key_found = true;
-				}
-			});
-
-			if (!key_found)
+			if (!std::find(ini.section_keys(p.substr(0, split)), {}, p.substr(split + 1)))
 				return -ENOENT;
 
 			if ((fi->flags & O_ACCMODE) != O_RDONLY)
@@ -142,23 +133,19 @@ namespace inifs
 			// Sectionless entries
 			assert(false && "unimplemented");
 		} else {
-			auto const target_key = p.substr(split + 1);
-			bool key_found = false;
-			ini.for_section(p.substr(0, split), [&](std::string const& key, std::string const& value) {
-				if (target_key == key) {
-					key_found = true;
-					if ((unsigned)offset < value.size()) {
-						if (offset + size > value.size())
-							size = value.size() - offset;
-						memcpy(buf, value.data() + offset, size);
-					} else {
-						size = 0;
-					}
+			if (auto key = std::find(ini.section_keys(p.substr(0, split)), {}, p.substr(split + 1)); key) {
+				auto const data = key.value().data();
+				auto const len = key.value().size();
+				if ((unsigned)offset < len) {
+					if (offset + size > len)
+						size = len - offset;
+					memcpy(buf, data + offset, size);
+				} else {
+					size = 0;
 				}
-			});
-
-			if (!key_found)
+			} else {
 				return -ENOENT;
+			}
 		}
 
 		return size;
