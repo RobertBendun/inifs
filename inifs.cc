@@ -3,6 +3,7 @@
 #include <cstring>
 #include <string_view>
 #include <cassert>
+#include <iomanip>
 
 #define FUSE_USE_VERSION 31
 #include <fuse.h>
@@ -151,6 +152,24 @@ namespace inifs
 
 		return size;
 	}
+
+	static int mkdir(char const* path, mode_t)
+	{
+#ifdef Debug_Mode
+		std::cout << "mkdir(" << std::quoted(path) << ", " << std::oct << mode << ")\n";
+#endif
+		if (path == "/"sv)
+			return -EEXIST;
+
+		auto const p = std::string_view(path+1);
+		if (p.find_first_of("/[]") != std::string_view::npos)
+			return -EINVAL;
+
+		auto &new_node = ini.nodes.emplace_back();
+		new_node.kind = INI::Node::Kind::Section;
+		new_node.value = p;
+		return 0;
+	}
 }
 
 int main(int argc, char **argv)
@@ -158,6 +177,7 @@ int main(int argc, char **argv)
 	fuse_operations oper = {};
 	oper.getattr = inifs::getattr;
 	oper.init    = inifs::init;
+	oper.mkdir   = inifs::mkdir;
 	oper.open    = inifs::open;
 	oper.read    = inifs::read;
 	oper.readdir = inifs::readdir;
