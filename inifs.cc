@@ -26,14 +26,11 @@ static const struct fuse_opt option_spec[] = {
 	FUSE_OPT_END
 };
 
-#define Content "hello, world!\n"
-
 INI ini;
 struct stat ini_stat;
 
 inline void update_stat(struct stat *dst)
 {
-
 	dst->st_ctime = ini_stat.st_ctime;
 	dst->st_atime = ini_stat.st_atime;
 	dst->st_mtime = ini_stat.st_mtime;
@@ -63,15 +60,13 @@ namespace inifs
 			std::string_view p = path+1;
 			auto split = p.find('/');
 			if (split == std::string_view::npos) {
-				ini.for_all_sections([&](std::string const& section) {
-					if (section == path + 1) {
-						stbuf->st_mode = S_IFDIR | 0755;
-						stbuf->st_nlink = 2;
-						stbuf->st_size = 0; // TODO add size
-						update_stat(stbuf);
-						res = 0;
-					}
-				});
+				if (auto section_it = std::find(ini.sections(), {}, path + 1); section_it) {
+					stbuf->st_mode = S_IFDIR | 0755;
+					stbuf->st_nlink = 2;
+					stbuf->st_size = 0; // TODO add size
+					update_stat(stbuf);
+					return 0;
+				}
 			} else {
 				auto target_key = p.substr(split + 1);
 				ini.for_section(p.substr(0, split), [&](std::string const& key, std::string const& value) {
@@ -98,9 +93,9 @@ namespace inifs
 		filler(buf, ".", NULL, 0, {});
 		filler(buf, "..", NULL, 0, {});
 		if (path == "/"sv) {
-			ini.for_all_sections([&](std::string const& section) {
-				filler(buf, section.c_str(), NULL, 0, {});
-			});
+			for (auto section = ini.sections(); section; ++section) {
+				filler(buf, section->c_str(), NULL, 0, {});
+			}
 			return 0;
 		}
 

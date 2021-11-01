@@ -2,6 +2,9 @@
 #include <fstream>
 #include <optional>
 #include <vector>
+#include <cassert>
+
+struct Sections_Iterator;
 
 struct INI
 {
@@ -46,9 +49,77 @@ struct INI
 		return false;
 	}
 
+	Sections_Iterator sections() const;
+
 	static std::optional<INI> from_file(std::string const& filename);
 	static std::optional<INI> from_string(std::string const& content);
 };
+
+template<typename T>
+struct INI_Iterator
+{
+	using iterator_category = std::forward_iterator_tag;
+	using value_type = std::string const&;
+	using reference = value_type;
+	using difference_type = int; // TODO maybe provide more accurate type?
+
+	INI const* ini = nullptr;
+	unsigned i = 0;
+
+	INI_Iterator const& as_ini_iterator() const { return *this; }
+
+	auto operator==(T const& other) const {
+		auto const& o = other.as_ini_iterator();
+		return ini == o.ini && (ini == nullptr ? 1 : i == o.i);
+	}
+
+	auto operator!=(T const& other) const { return !(*this == other); }
+
+	auto node() const -> INI::Node const&
+	{
+		assert(ini != nullptr);
+		assert(i < ini->nodes.size());
+		return ini->nodes[i];
+	}
+
+	operator bool() const {
+		return ini != nullptr && i < ini->nodes.size();
+	}
+
+	auto operator*() const -> std::string const&
+	{
+		return node().value;
+	}
+
+	std::string const* operator->() const
+	{
+		return &node().value;
+	}
+};
+
+struct Sections_Iterator : INI_Iterator<Sections_Iterator>
+{
+	Sections_Iterator& operator++()
+	{
+		assert(ini != nullptr);
+		assert(i < ini->nodes.size());
+
+		for (++i; i < ini->nodes.size(); ++i)
+			if (ini->nodes[i].kind == INI::Node::Kind::Section)
+				break;
+
+		return *this;
+	}
+};
+
+Sections_Iterator INI::sections() const
+{
+	for (auto i = 0u; i < nodes.size(); ++i)
+		if (nodes[i].kind == Node::Kind::Section)
+			return Sections_Iterator {{ this, i }};
+
+	return {};
+}
 
 std::optional<INI> INI::from_file(std::string const& filename)
 {
