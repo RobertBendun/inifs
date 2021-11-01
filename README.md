@@ -14,6 +14,9 @@ Educational filesystem allowing for FS traversal over INI file
 ## Example
 For file `example.ini`:
 ```ini
+author=Robert
+date=2021-11-01
+
 [kowalski]
 pos_x=10
 pos_y=20
@@ -28,18 +31,20 @@ name=Grzegorz Nowak
 ```console
 $ mkdir test
 $ inifs --ini=example.ini -f test &
-$ tree test
+$ tree test -p
 test
-├── kowalski
-│   ├── name
-│   ├── pos_x
-│   └── pos_y
-└── nowak
-    ├── name
-    ├── pos_x
-    └── pos_y
+├── [-rw-r--r--]  author
+├── [-rw-r--r--]  date
+├── [drwxr-xr-x]  kowalski
+│   ├── [-rw-r--r--]  name
+│   ├── [-rw-r--r--]  pos_x
+│   └── [-rw-r--r--]  pos_y
+└── [drwxr-xr-x]  nowak
+    ├── [-rw-r--r--]  name
+    ├── [-rw-r--r--]  pos_x
+    └── [-rw-r--r--]  pos_y
 
-2 directories, 6 files
+2 directories, 8 files
 ```
 
 ## See also
