@@ -29,6 +29,23 @@ struct INI
 		}
 	}
 
+	template<typename T>
+	bool for_section(std::string_view name, T &&t)
+	{
+		for (auto i = 0u; i < nodes.size(); ++i)
+			if (auto const& node = nodes[i]; node.kind == Node::Kind::Section && node.value == name) {
+				for (i += 1; i < nodes.size() - 1; i += 2) {
+					if (nodes[i].kind != Node::Kind::Key || nodes[i+1].kind != Node::Kind::Value)
+						break;
+
+					t(nodes[i].value, nodes[i+1].value);
+				}
+				return true;
+			}
+
+		return false;
+	}
+
 	static std::optional<INI> from_file(std::string const& filename);
 	static std::optional<INI> from_string(std::string const& content);
 };
