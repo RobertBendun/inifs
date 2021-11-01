@@ -63,12 +63,11 @@ namespace inifs
 				if (auto section = ini.sections(); section && (section = std::find(section, {}, p))) {
 					stbuf->st_mode = S_IFDIR | 0755;
 					stbuf->st_nlink = 2;
-					stbuf->st_size = 0; // TODO add size
 					update_stat(stbuf);
 					return 0;
 				}
 
-				if (auto key = std::find(ini.section_keys(), {}, p); key) {
+				if (auto const key = std::find(ini.section_keys(), {}, p); key) {
 					stbuf->st_mode = S_IFREG | 0644;
 					stbuf->st_nlink = 1;
 					stbuf->st_size = key.value().size();
@@ -76,7 +75,7 @@ namespace inifs
 					return 0;
 				}
 			} else {
-				if (auto key = std::find(ini.section_keys(p.substr(0, split)), {}, p.substr(split + 1)); key) {
+				if (auto const key = std::find(ini.section_keys(p.substr(0, split)), {}, p.substr(split + 1)); key) {
 					stbuf->st_mode = S_IFREG | 0644;
 					stbuf->st_nlink = 1;
 					stbuf->st_size = key.value().size();
@@ -118,8 +117,8 @@ namespace inifs
 
 	static int open(char const* path, fuse_file_info *fi)
 	{
-		auto p = std::string_view(path + 1);
-		auto split = p.find('/');
+		auto const p = std::string_view(path + 1);
+		auto const split = p.find('/');
 
 		if (!std::find(ini.section_keys(split == std::string_view::npos ? "" : p.substr(0, split)), {}, p.substr(split + 1)))
 			return -ENOENT;
@@ -132,9 +131,8 @@ namespace inifs
 
 	static int read(char const* path, char *buf, size_t size, off_t offset, fuse_file_info *)
 	{
-		auto p = std::string_view(path + 1);
-		auto split = p.find('/');
-
+		auto const p = std::string_view(path + 1);
+		auto const split = p.find('/');
 
 		if (auto key = std::find(ini.section_keys(split == std::string_view::npos ? "" : p.substr(0, split)), {}, p.substr(split + 1));
 				key) {
@@ -155,15 +153,14 @@ namespace inifs
 	}
 }
 
-
 int main(int argc, char **argv)
 {
 	fuse_operations oper = {};
 	oper.getattr = inifs::getattr;
-	oper.init = inifs::init;
+	oper.init    = inifs::init;
+	oper.open    = inifs::open;
+	oper.read    = inifs::read;
 	oper.readdir = inifs::readdir;
-	oper.open = inifs::open;
-	oper.read = inifs::read;
 
 	fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	if (fuse_opt_parse(&args, &options, option_spec, nullptr) == -1)
