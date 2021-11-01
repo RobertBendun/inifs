@@ -153,10 +153,12 @@ namespace inifs
 		return size;
 	}
 
-	static int mkdir(char const* path, mode_t)
+	static int mkdir(char const* path, mode_t mode)
 	{
 #ifdef Debug_Mode
-		std::cout << "mkdir(" << std::quoted(path) << ", " << std::oct << mode << ")\n";
+		std::cerr << "mkdir(" << std::quoted(path) << ", " << std::oct << mode << ")\n";
+#else
+		(void)mode;
 #endif
 		if (path == "/"sv)
 			return -EEXIST;
@@ -174,7 +176,7 @@ namespace inifs
 	static int rmdir(char const* path)
 	{
 #ifdef Debug_Mode
-		std::cout << "rmdir(" << std::quoted(path) << ")\n";
+		std::cerr << "rmdir(" << std::quoted(path) << ")\n";
 #endif
 
 		if (path == "/"sv)
@@ -190,6 +192,51 @@ namespace inifs
 
 		return -ENOTDIR;
 	}
+
+	int rename(char const* src, char const* dst, unsigned int flags)
+	{
+#ifdef Debug_Mode
+		std::cerr << "rename(" << std::quoted(src) << ", " << std::quoted(dst) << ", " << flags << ")\n";
+#endif
+
+		if (dst == "/"sv || src == "/"sv)
+			return -EPERM;
+
+		auto const s = std::string_view(src+1);
+		auto const d = std::string_view(dst+1);
+
+		auto const s_split = s.find('/');
+		auto const d_split = d.find('/');
+
+		if (s_split == std::string_view::npos && d_split == std::string_view::npos) {
+			if (d.find_first_of("[]") != std::string_view::npos) {
+				return -EINVAL;
+			}
+			if (auto s_sec = ini.sections(); s_sec && (s_sec = std::find(s_sec, {}, s))) {
+				if (auto d_sec = ini.sections(); d_sec && (d_sec = std::find(d_sec, {}, d))) {
+					switch (flags) {
+					case RENAME_EXCHANGE:
+						std::swap(ini.nodes[s_sec.i].value, ini.nodes[d_sec.i].value);
+						return 0;
+					case RENAME_NOREPLACE:
+						return -EEXIST;
+					}
+
+					if (auto d_next = std::next(d_sec); d_next ? d_next.node().kind == INI::Node::Kind::Section : 1) {
+						ini.nodes.erase(ini.nodes.cbegin() + d_sec.i);
+						return 0;
+					}
+					return -ENOTEMPTY;
+				}
+
+				ini.nodes[s_sec.i].value = d;
+				return 0;
+			}
+			return -EEXIST;
+		} else {
+			return -ENOSYS;
+		}
+	}
 }
 
 int main(int argc, char **argv)
@@ -201,6 +248,7 @@ int main(int argc, char **argv)
 	oper.open    = inifs::open;
 	oper.read    = inifs::read;
 	oper.readdir = inifs::readdir;
+	oper.rename  = inifs::rename;
 	oper.rmdir   = inifs::rmdir;
 
 	fuse_args args = FUSE_ARGS_INIT(argc, argv);
